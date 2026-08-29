@@ -1,314 +1,205 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Donnie BLE 動態組合鍵設定與實體測試</title>
-  <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-    .container { max-width: 960px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    h1, h2, h3 { text-align: center; margin-top: 0; }
-    .status-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; }
-    .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    .btn-primary { background: #007bff; color: white; }
-    .btn-success { background: #28a745; color: white; }
-    .btn-danger { background: #dc3545; color: white; }
-    .btn-warning { background: #ffc107; color: #212529; }
-    .btn-sm { padding: 4px 8px; font-size: 12px; margin-top: 5px; }
-    .profile-nav { display: flex; gap: 10px; align-items: center; overflow-x: auto; padding-bottom: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
-    .profile-tab { padding: 8px 16px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; white-space: nowrap; }
-    .profile-tab.active { background: #007bff; color: white; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 25px; }
-    .card { border: 1px solid #ddd; padding: 15px; border-radius: 6px; background: #fafafa; }
-    .card.nav-card { background: #fff3cd; border-color: #ffeeba; }
-    .checkbox-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 5px 0 10px 0; }
-    .checkbox-group label { font-size: 13px; cursor: pointer; }
-    .key-input-list { display: flex; flex-direction: column; gap: 5px; }
-    .key-input-item { display: flex; gap: 5px; align-items: center; }
-    input[type="text"] { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
-    
-    /* 測試專用區塊樣式 */
-    .test-section { background: #e8f4f8; border: 2px dashed #17a2b8; border-radius: 8px; padding: 15px; margin-top: 20px; }
-    .test-textarea { width: 100%; height: 100px; padding: 10px; box-sizing: border-box; font-size: 16px; border: 1px solid #17a2b8; border-radius: 4px; resize: vertical; }
-    .log-box { background: #222; color: #00ff00; font-family: monospace; padding: 10px; height: 100px; overflow-y: auto; border-radius: 4px; margin-top: 10px; font-size: 13px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donnie BLE 雙服務藍芽鍵盤配置器</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; color: #38bdf8; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #94a3b8; margin-bottom: 25px; }
+        .card { background-color: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+        .btn { background-color: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn:hover { background-color: #0369a1; }
+        .btn-green { background-color: #16a34a; }
+        .btn-green:hover { background-color: #15803d; }
+        .btn-purple { background-color: #9333ea; }
+        .btn-purple:hover { background-color: #7e22ce; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .profile-tab { background-color: #334155; padding: 8px 16px; border-radius: 6px; cursor: pointer; display: inline-block; margin-right: 5px; }
+        .profile-tab.active { background-color: #38bdf8; color: #0f172a; font-weight: bold; }
+        .button-row { display: flex; align-items: center; justify-content: space-between; background-color: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 8px; }
+        .btn-label { font-weight: bold; width: 100px; color: #e2e8f0; }
+        select, input[type="text"] { background-color: #334155; color: white; border: 1px solid #475569; padding: 6px 10px; border-radius: 6px; }
+        .mod-checkboxes label { margin-right: 10px; font-size: 14px; }
+        #log { background-color: #000; color: #4ade80; padding: 10px; border-radius: 6px; height: 100px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+    </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Donnie ESP32 動態選單與組合鍵設定</h1>
+    <h1>Donnie BLE 配置控制器</h1>
+    <p class="subtitle">將 G4 接地進入設定模式後，即可在此讀取與同步設定</p>
 
-  <div class="status-bar">
-    <div>狀態：<span id="connStatus" style="color:red; font-weight:bold;">未連線</span></div>
-    <div>
-      <button id="connectBtn" class="btn btn-primary">1. 連線藍芽</button>
-      <button id="saveBtn" class="btn btn-success" disabled>2. 同步資料庫至板子</button>
+    <div class="card">
+        <div class="btn-group">
+            <button class="btn" onclick="connectBLE()">1. 連線至 Donnie Config</button>
+            <button class="btn btn-purple" onclick="readFromBoard()">📥 讀取板子資訊</button>
+            <button class="btn btn-green" onclick="syncToBoard()">2. 同步資料至板子</button>
+        </div>
+        <div id="status">藍芽狀態：離線</div>
     </div>
-  </div>
 
-  <div class="profile-nav">
-    <div id="tabList" style="display:flex; gap:10px;"></div>
-    <button class="btn btn-primary" onclick="addProfile()">+ 新增選單方案</button>
-  </div>
+    <div class="card">
+        <div style="margin-bottom: 15px;">
+            <div id="profileTabs"></div>
+        </div>
 
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2 id="currentProfileTitle">選單方案 1</h2>
-    <button class="btn btn-danger btn-sm" onclick="deleteCurrentProfile()">刪除此方案</button>
-  </div>
+        <div style="margin-bottom: 15px;">
+            <label>方案名稱：</label>
+            <input type="text" id="profileName" onchange="updateProfileName(this.value)" placeholder="輸入方案名稱..." style="width: 200px;">
+        </div>
 
-  <div id="buttonGrid" class="grid"></div>
-
-  <!-- 實時模擬測試專區 -->
-  <div class="test-section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <h3 style="margin:0; color:#0c5460;">🎯 實體按鈕即時測試區</h3>
-      <button class="btn btn-warning btn-sm" onclick="clearTestArea()">清空測試框與 Log</button>
+        <div id="buttonConfigs"></div>
     </div>
-    <p style="font-size:13px; color:#555; margin-top:0;">請點擊下方文字框，讓游標停在裡面，然後按下 ESP32 實體按鈕即可直接驗證輸入與切換方案：</p>
-    <textarea id="testInput" class="test-textarea" placeholder="點擊此處後按下 ESP32 按鈕測試 (如 A, V, C 或 Ctrl+A 等)..." onkeydown="logKeyEvent(event)"></textarea>
 
-    <div style="margin-top:10px; font-weight:bold; font-size:13px; color:#333;">網頁接收 Keydown 事件紀錄：</div>
-    <div id="logBox" class="log-box">>>> 系統就緒，等待藍芽連線與測試按鍵輸入...<br></div>
-  </div>
+    <div class="card">
+        <h3>系統日誌 (Log)</h3>
+        <div id="log">等待連線中...<br></div>
+    </div>
 </div>
 
 <script>
-  const CONFIG_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-  const CONFIG_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-  let bluetoothDevice;
-  let configCharacteristic;
-  let activeProfileIdx = 0;
+let bleDevice, bleChar;
+let currentProfileIdx = 0;
 
-  const keyMap = {
-    'A': 0x04, 'B': 0x05, 'C': 0x06, 'D': 0x07, 'E': 0x08, 'F': 0x09, 'G': 0x0A,
-    'H': 0x0B, 'I': 0x0C, 'J': 0x0D, 'K': 0x0E, 'L': 0x0F, 'M': 0x10, 'N': 0x11,
-    'O': 0x12, 'P': 0x13, 'Q': 0x14, 'R': 0x15, 'S': 0x16, 'T': 0x17, 'U': 0x18,
-    'V': 0x19, 'W': 0x1A, 'X': 0x1B, 'Y': 0x1C, 'Z': 0x1D, 
-    '1': 0x1E, '2': 0x1F, '3': 0x20, '4': 0x21, '5': 0x22, '6': 0x23, '7': 0x24, '8': 0x25, '9': 0x26, '0': 0x27,
-    'ENTER': 0x28, 'ESC': 0x29, 'BACKSPACE': 0x2A, 'TAB': 0x2B, 'SPACE': 0x2C
-  };
+const btnNames = ["G3 (Up)", "G2 (方案-1)", "G1 (方案+1)", "G0 (Down)", "G5 (Func1)", "G6 (Func2)", "G7 (Func3)"];
 
-  const pinNames = ["G3 (上)", "G2 (方案 -1)", "G1 (方案 +1)", "G0 (下)", "G5 (功能鍵1)", "G6 (功能鍵2)", "G7 (功能鍵3)"];
-
-  let profiles = [
+let profiles = [
     {
-      name: "方案 1 (全選/複製/貼上)",
-      buttons: [
-        { mod: 0, keys: ["0x52"] }, // G3: Up
-        { mod: 0, keys: [] },       // G2: 方案 -1
-        { mod: 0, keys: [] },       // G1: 方案 +1
-        { mod: 0, keys: ["0x51"] }, // G0: Down
-        { mod: 1, keys: ["0x04"] }, // G5: Ctrl+A
-        { mod: 1, keys: ["0x19"] }, // G6: Ctrl+V
-        { mod: 1, keys: ["0x06"] }  // G7: Ctrl+C
-      ]
-    },
-    {
-      name: "方案 2 (單字 A / V / C)",
-      buttons: [
-        { mod: 0, keys: ["0x52"] }, // G3: Up
-        { mod: 0, keys: [] },       // G2: 方案 -1
-        { mod: 0, keys: [] },       // G1: 方案 +1
-        { mod: 0, keys: ["0x51"] }, // G0: Down
-        { mod: 0, keys: ["A"] },    // G5: A
-        { mod: 0, keys: ["V"] },    // G6: V
-        { mod: 0, keys: ["C"] }     // G7: C
-      ]
+        name: "預設通用方案",
+        buttons: [
+            { mod: 0, keys: [0x52] },
+            { mod: 0, keys: [] },
+            { mod: 0, keys: [] },
+            { mod: 0, keys: [0x51] },
+            { mod: 1, keys: [0x04] },
+            { mod: 1, keys: [0x19] },
+            { mod: 1, keys: [0x06] }
+        ]
     }
-  ];
+];
 
-  function renderTabs() {
-    const tabList = document.getElementById("tabList");
-    tabList.innerHTML = "";
-    profiles.forEach((p, idx) => {
-      const btn = document.createElement("button");
-      btn.className = `profile-tab ${idx === activeProfileIdx ? 'active' : ''}`;
-      btn.innerText = p.name;
-      btn.onclick = () => { activeProfileIdx = idx; renderGrid(); renderTabs(); };
-      tabList.appendChild(btn);
-    });
-  }
+function log(msg) {
+    const l = document.getElementById("log");
+    l.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+    l.scrollTop = l.scrollHeight;
+}
 
-  function renderGrid() {
-    document.getElementById("currentProfileTitle").innerText = profiles[activeProfileIdx].name;
-    const grid = document.getElementById("buttonGrid");
-    grid.innerHTML = "";
-
-    const prof = profiles[activeProfileIdx];
-
-    prof.buttons.forEach((btn, bIdx) => {
-      const isNav = (bIdx === 1 || bIdx === 2);
-      const card = document.createElement("div");
-      card.className = `card ${isNav ? 'nav-card' : ''}`;
-
-      if (isNav) {
-        const desc = (bIdx === 1) ? "（按下此按鈕：切換至上一方案 -1）" : "（按下此按鈕：切換至下一方案 +1）";
-        card.innerHTML = `<h3>${pinNames[bIdx]}</h3><p style="color:#856404; font-size:13px;">${desc}</p>`;
-      } else {
-        const ctrlChecked = (btn.mod & 1) ? "checked" : "";
-        const shiftChecked = (btn.mod & 2) ? "checked" : "";
-        const altChecked = (btn.mod & 4) ? "checked" : "";
-        const guiChecked = (btn.mod & 8) ? "checked" : "";
-
-        let keysHTML = "";
-        btn.keys.forEach((k, kIdx) => {
-          keysHTML += `
-            <div class="key-input-item">
-              <input type="text" value="${k}" placeholder="如 C、V 或 0x19" onchange="updateKeyVal(${bIdx}, ${kIdx}, this.value)" style="width:120px;">
-              <button class="btn btn-danger btn-sm" onclick="removeKeyInput(${bIdx}, ${kIdx})">刪除</button>
-            </div>
-          `;
+async function connectBLE() {
+    try {
+        log("正在搜尋 Donnie Config...");
+        bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: 'Donnie Config' }],
+            optionalServices: [SERVICE_UUID]
         });
 
-        card.innerHTML = `
-          <h3>${pinNames[bIdx]}</h3>
-          <label style="font-size:12px; font-weight:bold;">1. 勾選修飾鍵：</label>
-          <div class="checkbox-group">
-            <label><input type="checkbox" ${ctrlChecked} onchange="updateMod(${bIdx}, 1, this.checked)"> Ctrl</label>
-            <label><input type="checkbox" ${shiftChecked} onchange="updateMod(${bIdx}, 2, this.checked)"> Shift</label>
-            <label><input type="checkbox" ${altChecked} onchange="updateMod(${bIdx}, 4, this.checked)"> Alt</label>
-            <label><input type="checkbox" ${guiChecked} onchange="updateMod(${bIdx}, 8, this.checked)"> Win</label>
-          </div>
-          <label style="font-size:12px; font-weight:bold;">2. 自訂普通鍵：</label>
-          <div class="key-input-list">${keysHTML}</div>
-          <button class="btn btn-primary btn-sm" onclick="addKeyInput(${bIdx})">+ 新增普通鍵</button>
-        `;
-      }
-      grid.appendChild(card);
-    });
-  }
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        bleChar = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-  function updateMod(btnIdx, mask, checked) {
-    if (checked) {
-      profiles[activeProfileIdx].buttons[btnIdx].mod |= mask;
-    } else {
-      profiles[activeProfileIdx].buttons[btnIdx].mod &= ~mask;
-    }
-  }
-
-  function updateKeyVal(btnIdx, keyIdx, val) {
-    profiles[activeProfileIdx].buttons[btnIdx].keys[keyIdx] = val.trim().toUpperCase();
-  }
-
-  function addKeyInput(btnIdx) {
-    profiles[activeProfileIdx].buttons[btnIdx].keys.push("");
-    renderGrid();
-  }
-
-  function removeKeyInput(btnIdx, keyIdx) {
-    profiles[activeProfileIdx].buttons[btnIdx].keys.splice(keyIdx, 1);
-    renderGrid();
-  }
-
-  function addProfile() {
-    const newIdx = profiles.length + 1;
-    profiles.push({
-      name: `方案 ${newIdx}`,
-      buttons: [
-        { mod: 0, keys: ["0x52"] }, { mod: 0, keys: [] }, { mod: 0, keys: [] },
-        { mod: 0, keys: ["0x51"] }, { mod: 0, keys: [] }, { mod: 0, keys: [] }, { mod: 0, keys: [] }
-      ]
-    });
-    activeProfileIdx = profiles.length - 1;
-    renderTabs();
-    renderGrid();
-  }
-
-  function deleteCurrentProfile() {
-    if (profiles.length <= 1) {
-      alert("至少需要保留一個選單方案！");
-      return;
-    }
-    profiles.splice(activeProfileIdx, 1);
-    activeProfileIdx = 0;
-    renderTabs();
-    renderGrid();
-  }
-
-  function parseKeyHex(str) {
-    str = str.trim().toUpperCase();
-    if (keyMap[str]) return keyMap[str];
-    if (str.startsWith("0X")) return parseInt(str, 16);
-    return parseInt(str, 16) || 0;
-  }
-
-  document.getElementById("connectBtn").addEventListener("click", async () => {
-    try {
-      bluetoothDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [
-          CONFIG_SERVICE_UUID,
-          '00001812-0000-1000-8000-00805f9b34fb'
-        ]
-      });
-
-      const server = await bluetoothDevice.gatt.connect();
-      const service = await server.getPrimaryService(CONFIG_SERVICE_UUID);
-      configCharacteristic = await service.getCharacteristic(CONFIG_CHARACTERISTIC_UUID);
-
-      document.getElementById("connStatus").innerText = "已連線 (" + bluetoothDevice.name + ")";
-      document.getElementById("connStatus").style.color = "green";
-      document.getElementById("saveBtn").disabled = false;
-      addLog(">>> 成功連線藍芽裝置：" + bluetoothDevice.name);
+        document.getElementById("status").innerHTML = "藍芽狀態：<span style='color:#4ade80;'>已連線 (Donnie Config)</span>";
+        log("藍芽連線成功！");
     } catch (e) {
-      alert("連線失敗：" + e);
-      addLog(">>> 藍芽連線失敗：" + e);
+        log("連線失敗: " + e);
     }
-  });
+}
 
-  document.getElementById("saveBtn").addEventListener("click", async () => {
-    if (!configCharacteristic) return;
-
-    const payload = profiles.map(p => ({
-      buttons: p.buttons.map(b => ({
-        mod: b.mod,
-        keys: b.keys.map(k => parseKeyHex(k)).filter(k => k > 0)
-      }))
-    }));
-
-    const jsonStr = JSON.stringify(payload);
-    const encoder = new TextEncoder();
-    const data = encoder.encode(jsonStr);
-
-    const chunkSize = 100;
-    for (let i = 0; i < data.length; i += chunkSize) {
-      const chunk = data.slice(i, i + chunkSize);
-      await configCharacteristic.writeValue(chunk);
+async function readFromBoard() {
+    if (!bleChar) { log("請先連線藍芽！"); return; }
+    try {
+        log("讀取板子記憶體設定中...");
+        const value = await bleChar.readValue();
+        const decoder = new TextDecoder('utf-8');
+        const jsonStr = decoder.decode(value);
+        profiles = JSON.parse(jsonStr);
+        currentProfileIdx = 0;
+        renderTabs();
+        renderConfig();
+        log("成功讀取板子資訊！已套用至網頁。");
+    } catch (e) {
+        log("讀取失敗: " + e);
     }
-    await configCharacteristic.writeValue(encoder.encode("END"));
+}
 
-    alert("資料庫已成功同步儲存至板子內部！");
-    addLog(">>> 已將最新的方案資料庫寫入板子 ESP32-C3");
-  });
+async function syncToBoard() {
+    if (!bleChar) { log("請先連線藍芽！"); return; }
+    try {
+        const jsonStr = JSON.stringify(profiles);
+        log("傳送設定資料中...");
+        
+        const chunkSize = 100;
+        for (let i = 0; i < jsonStr.length; i += chunkSize) {
+            const chunk = jsonStr.substring(i, i + chunkSize);
+            await bleChar.writeValue(new TextEncoder().encode(chunk));
+            await new Promise(r => setTimeout(r, 50));
+        }
+        await bleChar.writeValue(new TextEncoder().encode("END"));
+        log("同步完成！完成後請放開 G4 恢復藍芽鍵盤模式。");
+    } catch (e) {
+        log("同步失敗: " + e);
+    }
+}
 
-  function logKeyEvent(e) {
-    let mods = [];
-    if (e.ctrlKey) mods.push("Ctrl");
-    if (e.shiftKey) mods.push("Shift");
-    if (e.altKey) mods.push("Alt");
-    if (e.metaKey) mods.push("Win/Cmd");
-    
-    let keyStr = e.key.toUpperCase();
-    let modStr = mods.length > 0 ? mods.join("+") + " + " : "";
-    
-    addLog(`[按鍵觸發] 組合鍵：${modStr}${keyStr} (Code: ${e.code})`);
-  }
+function renderTabs() {
+    const tabDiv = document.getElementById("profileTabs");
+    tabDiv.innerHTML = "";
+    profiles.forEach((p, idx) => {
+        const span = document.createElement("span");
+        span.className = `profile-tab ${idx === currentProfileIdx ? 'active' : ''}`;
+        span.innerText = p.name || `方案 ${idx + 1}`;
+        span.onclick = () => { currentProfileIdx = idx; renderTabs(); renderConfig(); };
+        tabDiv.appendChild(span);
+    });
+}
 
-  function addLog(msg) {
-    const logBox = document.getElementById("logBox");
-    logBox.innerHTML += `${msg}<br>`;
-    logBox.scrollTop = logBox.scrollHeight;
-  }
+function updateProfileName(val) {
+    profiles[currentProfileIdx].name = val;
+    renderTabs();
+}
 
-  function clearTestArea() {
-    document.getElementById("testInput").value = "";
-    document.getElementById("logBox").innerHTML = ">>> 已重置 Log<br>";
-  }
+function renderConfig() {
+    const curP = profiles[currentProfileIdx];
+    document.getElementById("profileName").value = curP.name || "";
+    const container = document.getElementById("buttonConfigs");
+    container.innerHTML = "";
 
-  renderTabs();
-  renderGrid();
+    btnNames.forEach((name, bIdx) => {
+        const btnData = curP.buttons[bIdx] || { mod: 0, keys: [] };
+        const row = document.createElement("div");
+        row.className = "button-row";
+
+        row.innerHTML = `
+            <span class="btn-label">${name}</span>
+            <div class="mod-checkboxes">
+                <label><input type="checkbox" ${btnData.mod & 1 ? 'checked' : ''} onchange="updateMod(${bIdx}, 1, this.checked)"> Ctrl</label>
+                <label><input type="checkbox" ${btnData.mod & 2 ? 'checked' : ''} onchange="updateMod(${bIdx}, 2, this.checked)"> Shift</label>
+                <label><input type="checkbox" ${btnData.mod & 4 ? 'checked' : ''} onchange="updateMod(${bIdx}, 4, this.checked)"> Alt</label>
+                <label><input type="checkbox" ${btnData.mod & 8 ? 'checked' : ''} onchange="updateMod(${bIdx}, 8, this.checked)"> Win</label>
+            </div>
+            <input type="text" value="${(btnData.keys || []).map(k => '0x' + k.toString(16).padStart(2,'0')).join(',')}" 
+                   onchange="updateKeys(${bIdx}, this.value)" placeholder="例: 0x04" style="width: 120px;">
+        `;
+        container.appendChild(row);
+    });
+}
+
+function updateMod(bIdx, bit, checked) {
+    if (checked) profiles[currentProfileIdx].buttons[bIdx].mod |= bit;
+    else profiles[currentProfileIdx].buttons[bIdx].mod &= ~bit;
+}
+
+function updateKeys(bIdx, val) {
+    const keys = val.split(',').map(s => parseInt(s.trim(), 16)).filter(n => !isNaN(n));
+    profiles[currentProfileIdx].buttons[bIdx].keys = keys;
+}
+
+renderTabs();
+renderConfig();
 </script>
-
 </body>
 </html>
