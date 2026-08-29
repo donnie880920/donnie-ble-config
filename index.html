@@ -16,25 +16,28 @@
         .btn-green:hover { background-color: #15803d; }
         .btn-purple { background-color: #9333ea; }
         .btn-purple:hover { background-color: #7e22ce; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-sm { padding: 5px 10px; font-size: 13px; border-radius: 4px; }
         .btn-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        .profile-tab { background-color: #334155; padding: 8px 16px; border-radius: 6px; cursor: pointer; display: inline-block; margin-right: 5px; }
+        .profile-tab { background-color: #334155; padding: 8px 16px; border-radius: 6px; cursor: pointer; display: inline-block; margin-right: 5px; margin-bottom: 5px; }
         .profile-tab.active { background-color: #38bdf8; color: #0f172a; font-weight: bold; }
         .button-row { display: flex; align-items: center; justify-content: space-between; background-color: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 8px; }
-        .btn-label { font-weight: bold; width: 100px; color: #e2e8f0; }
+        .btn-label { font-weight: bold; width: 120px; color: #e2e8f0; }
         select, input[type="text"] { background-color: #334155; color: white; border: 1px solid #475569; padding: 6px 10px; border-radius: 6px; }
         .mod-checkboxes label { margin-right: 10px; font-size: 14px; }
-        #log { background-color: #000; color: #4ade80; padding: 10px; border-radius: 6px; height: 100px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        #log { background-color: #000; color: #4ade80; padding: 10px; border-radius: 6px; height: 120px; overflow-y: auto; font-family: monospace; font-size: 12px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Donnie BLE 配置控制器</h1>
-    <p class="subtitle">將 G4 接地進入設定模式後，即可在此讀取與同步設定</p>
+    <p class="subtitle">連接 Donnie Controller 後即可讀取、修改與即時同步鍵盤設定</p>
 
     <div class="card">
         <div class="btn-group">
-            <button class="btn" onclick="connectBLE()">1. 連線至 Donnie Config</button>
+            <button class="btn" onclick="connectBLE()">1. 連線至 Donnie Controller</button>
             <button class="btn btn-purple" onclick="readFromBoard()">📥 讀取板子資訊</button>
             <button class="btn btn-green" onclick="syncToBoard()">2. 同步資料至板子</button>
         </div>
@@ -42,13 +45,17 @@
     </div>
 
     <div class="card">
-        <div style="margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <div id="profileTabs"></div>
+            <div>
+                <button class="btn btn-sm btn-green" onclick="addProfile()">+ 新增方案</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteProfile()">- 刪除方案</button>
+            </div>
         </div>
 
         <div style="margin-bottom: 15px;">
             <label>方案名稱：</label>
-            <input type="text" id="profileName" onchange="updateProfileName(this.value)" placeholder="輸入方案名稱..." style="width: 200px;">
+            <input type="text" id="profileName" oninput="updateProfileName(this.value)" placeholder="輸入方案名稱..." style="width: 220px;">
         </div>
 
         <div id="buttonConfigs"></div>
@@ -92,9 +99,9 @@ function log(msg) {
 
 async function connectBLE() {
     try {
-        log("正在搜尋 Donnie Config...");
+        log("正在搜尋 Donnie Controller...");
         bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: 'Donnie Config' }],
+            filters: [{ name: 'Donnie Controller' }],
             optionalServices: [SERVICE_UUID]
         });
 
@@ -102,7 +109,7 @@ async function connectBLE() {
         const service = await server.getPrimaryService(SERVICE_UUID);
         bleChar = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-        document.getElementById("status").innerHTML = "藍芽狀態：<span style='color:#4ade80;'>已連線 (Donnie Config)</span>";
+        document.getElementById("status").innerHTML = "藍芽狀態：<span style='color:#4ade80;'>已連線 (Donnie Controller)</span>";
         log("藍芽連線成功！");
     } catch (e) {
         log("連線失敗: " + e);
@@ -116,11 +123,13 @@ async function readFromBoard() {
         const value = await bleChar.readValue();
         const decoder = new TextDecoder('utf-8');
         const jsonStr = decoder.decode(value);
-        profiles = JSON.parse(jsonStr);
-        currentProfileIdx = 0;
-        renderTabs();
-        renderConfig();
-        log("成功讀取板子資訊！已套用至網頁。");
+        if (jsonStr) {
+            profiles = JSON.parse(jsonStr);
+            currentProfileIdx = 0;
+            renderTabs();
+            renderConfig();
+            log("成功讀取板子資訊！已套用至網頁。");
+        }
     } catch (e) {
         log("讀取失敗: " + e);
     }
@@ -139,7 +148,7 @@ async function syncToBoard() {
             await new Promise(r => setTimeout(r, 50));
         }
         await bleChar.writeValue(new TextEncoder().encode("END"));
-        log("同步完成！完成後請放開 G4 恢復藍芽鍵盤模式。");
+        log("同步完成！板子已更新儲存設定。");
     } catch (e) {
         log("同步失敗: " + e);
     }
@@ -157,6 +166,34 @@ function renderTabs() {
     });
 }
 
+function addProfile() {
+    if (profiles.length >= 5) {
+        log("最多只能建立 5 組方案！");
+        return;
+    }
+    const newProfile = {
+        name: `新方案 ${profiles.length + 1}`,
+        buttons: Array(7).fill(null).map(() => ({ mod: 0, keys: [] }))
+    };
+    profiles.push(newProfile);
+    currentProfileIdx = profiles.length - 1;
+    renderTabs();
+    renderConfig();
+    log("已建立新方案");
+}
+
+function deleteProfile() {
+    if (profiles.length <= 1) {
+        log("至少需保留一組方案！");
+        return;
+    }
+    profiles.splice(currentProfileIdx, 1);
+    currentProfileIdx = Math.max(0, currentProfileIdx - 1);
+    renderTabs();
+    renderConfig();
+    log("已刪除方案");
+}
+
 function updateProfileName(val) {
     profiles[currentProfileIdx].name = val;
     renderTabs();
@@ -169,7 +206,7 @@ function renderConfig() {
     container.innerHTML = "";
 
     btnNames.forEach((name, bIdx) => {
-        const btnData = curP.buttons[bIdx] || { mod: 0, keys: [] };
+        const btnData = (curP.buttons && curP.buttons[bIdx]) ? curP.buttons[bIdx] : { mod: 0, keys: [] };
         const row = document.createElement("div");
         row.className = "button-row";
 
@@ -189,11 +226,17 @@ function renderConfig() {
 }
 
 function updateMod(bIdx, bit, checked) {
+    if (!profiles[currentProfileIdx].buttons[bIdx]) {
+        profiles[currentProfileIdx].buttons[bIdx] = { mod: 0, keys: [] };
+    }
     if (checked) profiles[currentProfileIdx].buttons[bIdx].mod |= bit;
     else profiles[currentProfileIdx].buttons[bIdx].mod &= ~bit;
 }
 
 function updateKeys(bIdx, val) {
+    if (!profiles[currentProfileIdx].buttons[bIdx]) {
+        profiles[currentProfileIdx].buttons[bIdx] = { mod: 0, keys: [] };
+    }
     const keys = val.split(',').map(s => parseInt(s.trim(), 16)).filter(n => !isNaN(n));
     profiles[currentProfileIdx].buttons[bIdx].keys = keys;
 }
@@ -202,4 +245,4 @@ renderTabs();
 renderConfig();
 </script>
 </body>
-</html>
+</html>ㄋ
